@@ -10,6 +10,12 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 # new upstream commits.
 ARG HERMES_REF=v2026.4.30
 
+# gbrain (Garry Tan's opinionated brain for Hermes/OpenClaw agents) baked
+# in so it's available the moment the container boots — no manual SSH +
+# install dance after every Railway redeploy. Pin a tag for reproducibility;
+# bump intentionally.
+ARG GBRAIN_REF=v0.26.0
+
 # tini = tiny init that we run as PID 1. Without it, hermes's grandchild
 # processes (MCP stdio servers, git, bun, browser daemons spawned by tools)
 # reparent to PID 1 when their parents exit and pile up as zombies. After
@@ -22,7 +28,7 @@ ARG HERMES_REF=v2026.4.30
 # Node.js is required only at build time to compile the Hermes React dashboard.
 # We strip the source + apt lists afterwards to keep the image lean.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates git tini && \
+    apt-get install -y --no-install-recommends curl ca-certificates git tini unzip && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
@@ -58,6 +64,24 @@ RUN git clone --depth 1 --branch ${HERMES_REF} https://github.com/NousResearch/h
 
 COPY requirements.txt /app/requirements.txt
 RUN uv pip install --system --no-cache -r /app/requirements.txt
+
+# Install Bun + gbrain into the image (not the persistent volume) so they
+# survive every Railway redeploy without a manual re-install. We pin
+# BUN_INSTALL=/opt/bun so HOME=/data later doesn't push bun into the volume.
+# `bun link` registers the gbrain CLI in /opt/bun/bin; we then symlink into
+# /usr/local/bin so plain `bash -c "gbrain ..."` (the shape the Hermes
+# terminal toolset uses) finds it without any PATH gymnastics.
+ENV BUN_INSTALL=/opt/bun
+ENV PATH="/opt/bun/bin:${PATH}"
+RUN curl -fsSL https://bun.sh/install | bash && \
+    git clone --depth 1 --branch ${GBRAIN_REF} https://github.com/garrytan/gbrain.git /opt/gbrain && \
+    cd /opt/gbrain && \
+    bun install --frozen-lockfile && \
+    bun link && \
+    ln -sf /opt/bun/bin/bun /usr/local/bin/bun && \
+    ln -sf /opt/bun/bin/bunx /usr/local/bin/bunx && \
+    ln -sf /opt/bun/bin/gbrain /usr/local/bin/gbrain && \
+    rm -rf /opt/gbrain/.git
 
 RUN mkdir -p /data/.hermes
 

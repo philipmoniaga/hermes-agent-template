@@ -16,6 +16,14 @@ fi
 
 [ ! -f /data/.hermes/.env ] && touch /data/.hermes/.env
 
+# Initialize the gbrain database on first boot. PGLite lives in the
+# persistent volume at /data/.gbrain, so we only run init when the directory
+# is missing — every subsequent container reuses the same brain.
+if [ ! -d /data/.gbrain ] && command -v gbrain >/dev/null 2>&1; then
+  echo "[start] No /data/.gbrain found — running 'gbrain init' to seed the brain."
+  ( cd /data && gbrain init ) || echo "[start] WARN: gbrain init failed (continuing)."
+fi
+
 # Clear any stale gateway PID file left over from the previous container.
 # `hermes gateway` writes /data/.hermes/gateway.pid on start but does not
 # remove it on SIGTERM. Since /data is a persistent volume, the file
