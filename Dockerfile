@@ -8,7 +8,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 # newest tag (format `vYYYY.M.D`, e.g. `v2026.4.23`) and update the default
 # below. Use `main` only if you accept that every rebuild can pull arbitrary
 # new upstream commits.
-ARG HERMES_REF=v2026.5.16
+ARG HERMES_REF=2a8d2174173ab8d05d0b48a44580a8c0b2c8c19b
 
 # gbrain (Garry Tan's opinionated brain for Hermes/OpenClaw agents) baked
 # in so it's available the moment the container boots — no manual SSH +
